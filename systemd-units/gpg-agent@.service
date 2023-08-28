@@ -1,0 +1,11 @@
+[Unit]
+Description=gpg4win to WSL connector for GPG
+Requires=gpg-agent.socket
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/npiperelay.exe -ep -ei -s -a 'C:/Users/alexm/AppData/Local/gnupg/S.gpg-agent.extra'
+StandardInput=socket
+
+[Install]
+WantedBy=default.target
