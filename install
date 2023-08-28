@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -e
+#This is a fork of npiperelay that supports Assuan, the protocol that gpg-agent speaks
+NPRREPO="NZSmartie/npiperelay"
+NPRFILE="npiperelay.exe"
+NPRFILEURL="https://github.com/NZSmartie/npiperelay/releases/download/v0.1/npiperelay.exe"
+
+#This is taken verbatim from the upstream installation instructions:
+#https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
+install_gh() {
+	printf 'This will install GitHub CLI (gh) using apt. You may be asked for a sudo password.\n'
+	type -p curl >/dev/null || sudo apt install curl -y
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+		&& sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+		&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+		&& sudo apt update \
+		&& sudo apt install gh -y
+}
+
+#remove CR from CRLF and flip \ to /
+fixpath() {
+	tr -d '\015' | tr '\\' '/'
+}
+
+enable_w32_ssh() {
+	gpgagentconf=$(wslpath -u $(gpgconf.exe --list-dirs homedir | fixpath))
+	grep -q enable-win32-openssh-support $gpgagentconf || printf 'enable-win32-openssh-support\r\n' >> $gpgagentconf
+	gpg-connect-agent.exe reloadagent /bye
+}
+
+#System Paths
+#If you edit these, the install will not work.
+workdir="$(mktemp -d install-ssh-pageant-XXXX)"
+nprfile_w="${workdir}/$NPRFILE"
+gpgwinpath="$(gpgconf.exe --list-dirs agent-extra-socket | fixpath)"
+unitdir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+
+#You can edit these if you really want, but they are sensible defaults
+#Where to install the npiperelay binary. This MUST be on the Windows filesystem.
+nprwinpath="$(powershell.exe -NoProfile -Command \$env:AppData | fixpath)/npiperelay/$NPRFILE"
+nprwinpath_u="$(wslpath -u "$nprwinpath")"
+
+#Where to install the symlink to npiperelay so that systemd can easily call it.
+#It doesn't HAVE to be on the WSL filesystem, but it's much easier if it is.
+nprlocalpath="$HOME/.local/bin/$NPRFILE"
+
+printf 'Downloading %s...\n' "$NPRFILE"
+if [ -z "$1" ]; then
+	curl -fsSL --output "${nprfile_w}"
+else
+	hash gh 2>/dev/null || install_gh
+	gh release download -p $NPRFILE -R $NPRREPO -D "${workdir}"
+fi
+
+printf 'Installing...\n'
+sed 's%^ExecStart=\%h/.local/bin/npiperelay.exe%ExecStart='"${nprlocalpath}"'%' systemd-units/gpg-agent-ssh@.service > "${workdir}/gpg-agent-ssh@.service"
+sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${nprwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
+cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
+install -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
+install -Dm 644 -t "${unitdir}" systemd-units/*
+install -d "${localbin}"
+ln -nfs "${nprwinpath_u}" "${localbin}"
+
+rm -r "${workdir}"
+
+printf 'Installation complete!\nRemember to add\n\n\t$HOME/.local/bin/gpg-agent-relay start\n\nto your .bashrc!\n'
