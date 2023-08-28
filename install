@@ -55,7 +55,7 @@ fi
 
 printf 'Installing...\n'
 sed 's%^ExecStart=\%h/.local/bin/npiperelay.exe%ExecStart='"${nprlocalpath}"'%' systemd-units/gpg-agent-ssh@.service > "${workdir}/gpg-agent-ssh@.service"
-sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${nprwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
+sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${gpgwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
 cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
 install -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
 install -Dm 644 -t "${unitdir}" $workdir/*
