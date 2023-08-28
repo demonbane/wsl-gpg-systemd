@@ -42,7 +42,8 @@ nprwinpath_u="$(wslpath -u "$nprwinpath")"
 
 #Where to install the symlink to npiperelay so that systemd can easily call it.
 #It doesn't HAVE to be on the WSL filesystem, but it's much easier if it is.
-nprlocalpath="$HOME/.local/bin/$NPRFILE"
+localbin="$HOME/.local/bin"
+nprlocalpath="${localbin}/$NPRFILE"
 
 printf 'Downloading %s...\n' "$NPRFILE"
 if [ -z "$1" ]; then
