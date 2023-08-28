@@ -46,7 +46,7 @@ nprlocalpath="$HOME/.local/bin/$NPRFILE"
 
 printf 'Downloading %s...\n' "$NPRFILE"
 if [ -z "$1" ]; then
-	curl -fsSL --output "${nprfile_w}"
+	curl -fsSL --output "${nprfile_w}" "$NPRFILEURL"
 else
 	hash gh 2>/dev/null || install_gh
 	gh release download -p $NPRFILE -R $NPRREPO -D "${workdir}"
