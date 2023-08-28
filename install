@@ -58,10 +58,10 @@ sed 's%^ExecStart=\%h/.local/bin/npiperelay.exe%ExecStart='"${nprlocalpath}"'%' 
 sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${nprwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
 cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
 install -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
-install -Dm 644 -t "${unitdir}" systemd-units/*
+install -Dm 644 -t "${unitdir}" $workdir/*
 install -d "${localbin}"
 ln -nfs "${nprwinpath_u}" "${localbin}"
 
 rm -r "${workdir}"
 
-printf 'Installation complete!\nRemember to add\n\n\t$HOME/.local/bin/gpg-agent-relay start\n\nto your .bashrc!\n'
+printf 'Installation complete!\n'
