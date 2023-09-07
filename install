@@ -5,6 +5,30 @@ NPRREPO="NZSmartie/npiperelay"
 NPRFILE="npiperelay.exe"
 NPRFILEURL="https://github.com/NZSmartie/npiperelay/releases/download/v0.1/npiperelay.exe"
 
+usage() {
+	echo 'Usage: install [-hgv]'
+	echo 'Install wsl-gpg-systemd automatically. See README for manual instructions.'
+	echo ''
+	echo '  -h, --help      this help'
+	echo '  -g, --gh        use GitHub CLI to fetch npiperelay, installing it first if necessary'
+	echo '  -v, --verbose   show verbose output when available'
+	echo ''
+	exit $1
+}
+
+opts=$(getopt -o 'ghv' --long 'gh,help,verbose' -n install -- "$@")
+eval set -- "$opts"
+unset opts
+
+for opt; do
+	case "$opt" in
+		-g|--gh) usegh="true";;
+		-h|--help) usage;;
+		-v|--verbose) verbose="-v";;
+		*) break;;
+	esac
+done
+
 #This is taken verbatim from the upstream installation instructions:
 #https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
 install_gh() {
@@ -30,7 +54,7 @@ enable_w32_ssh() {
 
 #System Paths
 #If you edit these, the install will not work.
-workdir="$(mktemp -d install-ssh-pageant-XXXX)"
+workdir="$(mktemp -p '' -d install-ssh-pageant-XXXX)"
 nprfile_w="${workdir}/$NPRFILE"
 gpgwinpath="$(gpgconf.exe --list-dirs agent-extra-socket | fixpath)"
 unitdir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
@@ -46,21 +70,21 @@ localbin="$HOME/.local/bin"
 nprlocalpath="${localbin}/$NPRFILE"
 
 printf 'Downloading %s...\n' "$NPRFILE"
-if [ -z "$1" ]; then
-	curl -fsSL --output "${nprfile_w}" "$NPRFILEURL"
-else
+if [ $usegh ]; then
 	hash gh 2>/dev/null || install_gh
 	gh release download -p $NPRFILE -R $NPRREPO -D "${workdir}"
+else
+	curl -fsSL --output "${nprfile_w}" "$NPRFILEURL"
 fi
 
 printf 'Installing...\n'
 sed 's%^ExecStart=\%h/.local/bin/npiperelay.exe%ExecStart='"${nprlocalpath}"'%' systemd-units/gpg-agent-ssh@.service > "${workdir}/gpg-agent-ssh@.service"
 sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${gpgwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
 cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
-install -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
-install -Dm 644 -t "${unitdir}" $workdir/*
-install -d "${localbin}"
-ln -nfs "${nprwinpath_u}" "${localbin}"
+install $verbose -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
+install $verbose -Dm 644 -t "${unitdir}" $workdir/*
+install $verbose -d "${localbin}"
+ln $verbose -nfs "${nprwinpath_u}" "${localbin}"
 
 rm -r "${workdir}"
 
