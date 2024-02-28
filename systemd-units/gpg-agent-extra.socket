@@ -1,9 +1,9 @@
 [Unit]
-Description=GnuPG cryptographic agent and passphrase cache (S.gpg-agent)
+Description=GnuPG cryptographic agent and passphrase cache (S.gpg-agent.extra)
 Documentation=man:gpg-agent(1)
 
 [Socket]
-ListenStream=%t/gnupg/S.gpg-agent
+ListenStream=%t/gnupg/S.gpg-agent.extra
 SocketMode=0600
 DirectoryMode=0700
 Accept=true

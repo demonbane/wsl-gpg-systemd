@@ -4,8 +4,9 @@ Requires=gpg-agent-ssh.socket
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/npiperelay.exe -ei -s '//./pipe/openssh-ssh-agent'
+ExecStart=%h/.local/bin/npiperelay.exe -v -p -ei -s '//./pipe/openssh-ssh-agent'
 StandardInput=socket
+StandardError=journal
 
 [Install]
 WantedBy=default.target
