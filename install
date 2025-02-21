@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 #This is a fork of npiperelay that supports Assuan, the protocol that gpg-agent speaks
-NPRREPO="NZSmartie/npiperelay"
-NPRFILE="npiperelay.exe"
-NPRFILEURL="https://github.com/NZSmartie/npiperelay/releases/download/v0.1/npiperelay.exe"
+NPRREPO="albertony/npiperelay"
+NPRFILE="npiperelay_windows_amd64.exe"
+NPRFILEURL="https://github.com/albertony/npiperelay/releases/download/v1.8.0/npiperelay_windows_amd64.exe"
 
 usage() {
 	echo 'Usage: install [-hgv]'
