@@ -3,7 +3,7 @@ set -e
 #This is a fork of npiperelay that supports Assuan, the protocol that gpg-agent speaks
 NPRREPO="albertony/npiperelay"
 NPRFILE="npiperelay_windows_amd64.exe"
-NPRFILEURL="https://github.com/albertony/npiperelay/releases/download/v1.8.0/npiperelay_windows_amd64.exe"
+NPRFILEURL="https://github.com/albertony/npiperelay/releases/download/v1.10.0/npiperelay_windows_amd64.exe"
 
 usage() {
 	echo 'Usage: install [-hgv]'
@@ -94,7 +94,8 @@ install $verbose -Dm 644 systemd-units/gpg-agent-launch.service "${unitdir}/gpg-
 install $verbose -d "${localbin}"
 ln $verbose -nfs "${nprwinpath_u}" "${localbin}"
 ln $verbose -nfs "${gpgconfwinpath_u}" "${localbin}/gpgconf-windows.exe"
-systemctl --user enable --now gpg-agent-launch.service > /dev/null
+systemctl --user enable gpg-agent-launch.service > /dev/null
+systemctl --user restart gpg-agent-launch.service > /dev/null
 
 rm -r "${workdir}"
 
