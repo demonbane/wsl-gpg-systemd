@@ -90,9 +90,11 @@ sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${gpgwinpath}'%"
 cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
 install $verbose -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
 install $verbose -Dm 644 -t "${unitdir}" $workdir/*
+install $verbose -Dm 644 systemd-units/gpg-agent-launch.service "${unitdir}/gpg-agent-launch.service"
 install $verbose -d "${localbin}"
 ln $verbose -nfs "${nprwinpath_u}" "${localbin}"
 ln $verbose -nfs "${gpgconfwinpath_u}" "${localbin}/gpgconf-windows.exe"
+systemctl --user enable --now gpg-agent-launch.service > /dev/null
 
 rm -r "${workdir}"
 

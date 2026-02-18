@@ -1,0 +1,10 @@
+[Unit]
+Description=Launch Windows gpg-agent for WSL relay
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gpgconf-windows.exe --launch gpg-agent
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target
