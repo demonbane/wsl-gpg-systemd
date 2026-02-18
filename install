@@ -59,6 +59,11 @@ enable_w32_ssh() {
 workdir="$(mktemp -p '' -d install-ssh-pageant-XXXX)"
 nprfile_w="${workdir}/$NPRFILE"
 gpgwinpath="$(gpgconf.exe --list-dirs agent-extra-socket | fixpath)"
+gpgconfwinpath_u="$(type -aP gpgconf.exe | awk '/^\/mnt\// { print; exit }')"
+if [ -z "${gpgconfwinpath_u}" ]; then
+	printf 'Error: could not locate a Windows gpgconf.exe in PATH.\n' >&2
+	exit 1
+fi
 unitdir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
 #You can edit these if you really want, but they are sensible defaults
@@ -68,7 +73,7 @@ nprwinpath_u="$(wslpath -u "$nprwinpath")"
 
 #Where to install the symlink to npiperelay so that systemd can easily call it.
 #It doesn't HAVE to be on the WSL filesystem, but it's much easier if it is.
-localbin="$HOME/.local/bin"
+localbin="${XDG_BIN_HOME:-$HOME/.local/bin}"
 nprlocalpath="${localbin}/$NPRFILE"
 
 printf 'Downloading %s...\n' "$NPRFILE"
@@ -87,6 +92,7 @@ install $verbose -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
 install $verbose -Dm 644 -t "${unitdir}" $workdir/*
 install $verbose -d "${localbin}"
 ln $verbose -nfs "${nprwinpath_u}" "${localbin}"
+ln $verbose -nfs "${gpgconfwinpath_u}" "${localbin}/gpgconf-windows.exe"
 
 rm -r "${workdir}"
 
