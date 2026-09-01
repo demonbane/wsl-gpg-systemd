@@ -3,7 +3,7 @@ set -e
 #This is a fork of npiperelay that supports Assuan, the protocol that gpg-agent speaks
 NPRREPO="albertony/npiperelay"
 NPRFILE="npiperelay_windows_amd64.exe"
-NPRFILEURL="https://github.com/albertony/npiperelay/releases/download/v1.10.0/npiperelay_windows_amd64.exe"
+NPRFILEURL="https://github.com/albertony/npiperelay/releases/download/v1.12.0/npiperelay_windows_amd64.exe"
 
 usage() {
 	echo 'Usage: install [-hgv]'
@@ -13,7 +13,7 @@ usage() {
 	echo '  -g, --gh        use GitHub CLI to fetch npiperelay, installing it first if necessary'
 	echo '  -v, --verbose   show verbose output when available'
 	echo ''
-	exit $1
+	exit "$1"
 }
 
 opts=$(getopt -o 'ghv' --long 'gh,help,verbose' -n install -- "$@")
@@ -49,54 +49,105 @@ fixpath() {
 }
 
 enable_w32_ssh() {
-	gpgagentconf=$(wslpath -u $(gpgconf.exe --list-dirs homedir | fixpath))
-	grep -q enable-win32-openssh-support $gpgagentconf || printf 'enable-win32-openssh-support\r\n' >> $gpgagentconf
+	gpgagentconf="$(wslpath -u "$(gpgconf.exe --list-dirs homedir | fixpath)")"
+	grep -q enable-win32-openssh-support "$gpgagentconf" || printf 'enable-win32-openssh-support\r\n' >> "$gpgagentconf"
 	gpg-connect-agent.exe reloadagent /bye
 }
 
-#System Paths
-#If you edit these, the install will not work.
-workdir="$(mktemp -p '' -d install-ssh-pageant-XXXX)"
-nprfile_w="${workdir}/$NPRFILE"
-gpgwinpath="$(gpgconf.exe --list-dirs agent-extra-socket | fixpath)"
-gpgconfwinpath_u="$(type -aP gpgconf.exe | awk '/^\/mnt\// { print; exit }')"
-if [ -z "${gpgconfwinpath_u}" ]; then
+##############
+# Initialize #
+##############
+# Define the directory to store systemd units
+dir_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+
+# Define the directory to store / link local software.
+# Note: It doesn't HAVE to be on the WSL filesystem, but it's much easier if it is.
+dir_bin="${XDG_BIN_HOME:-$HOME/.local/bin}"
+
+# Define the WSL2 mounted path to the npiperelay installation destination.
+# Note: This MUST be on the Windows filesystem!
+npr_path_win="$(powershell.exe -NoProfile -Command \$env:AppData | fixpath)/npiperelay/$NPRFILE"
+npr_path="$(wslpath -u "$npr_path_win")"
+
+# Define the WSL2 mounted path to gpgconf.exe on Windows
+gpgconf_path="$(type -aP gpgconf.exe | awk '/^\/mnt\// { print; exit }')"
+if [ -z "${gpgconf_path}" ]; then
 	printf 'Error: could not locate a Windows gpgconf.exe in PATH.\n' >&2
 	exit 1
 fi
-unitdir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
-#You can edit these if you really want, but they are sensible defaults
-#Where to install the npiperelay binary. This MUST be on the Windows filesystem.
-nprwinpath="$(powershell.exe -NoProfile -Command \$env:AppData | fixpath)/npiperelay/$NPRFILE"
-nprwinpath_u="$(wslpath -u "$nprwinpath")"
+# Create a temporary working directory
+dir_tmp="$(mktemp -p '' -d install-ssh-pageant-XXXX)"
 
-#Where to install the symlink to npiperelay so that systemd can easily call it.
-#It doesn't HAVE to be on the WSL filesystem, but it's much easier if it is.
-localbin="${XDG_BIN_HOME:-$HOME/.local/bin}"
-nprlocalpath="${localbin}/$NPRFILE"
+# Define the working directory path to npiperelay
+npr_path_tmp="${dir_tmp}/$NPRFILE"
 
+######################
+# Install npiperelay #
+######################
 printf 'Downloading %s...\n' "$NPRFILE"
+
 if [ $usegh ]; then
+	# Install using GitHub CLI
 	hash gh 2>/dev/null || install_gh
-	gh release download -p $NPRFILE -R $NPRREPO -D "${workdir}"
+	gh release download -p "$NPRFILE" -R "$NPRREPO" -D "${dir_tmp}"
 else
-	curl -fsSL --output "${nprfile_w}" "$NPRFILEURL"
+	# Install using curl
+	curl -fsSL --output "${npr_path_tmp}" "$NPRFILEURL"
 fi
 
+#############################
+# Prepare working directory #
+#############################
+# Find windows paths to the GPG agent socket files (normal and extra)
+gpg_path_win_socket="$(gpgconf.exe --list-dirs agent-socket | fixpath)"
+gpg_path_win_socket_extra="$(gpgconf.exe --list-dirs agent-extra-socket | fixpath)"
+
+# sed rules
+sed_dir_bin="s|%dir_bin%|${dir_bin}|g"
+sed_gpgconf_path="s|%gpgconf_path%|${dir_bin}/gpgconf-windows.exe|g"
+sed_npr_path="s|%npr_path%|${dir_bin}/${NPRFILE}|g"
+
+# Copy template files
+cp \
+	systemd-units/gpg-agent.socket \
+	systemd-units/gpg-agent-extra.socket \
+	systemd-units/gpg-agent-ssh.socket \
+	"${dir_tmp}/"
+
+# Modify template files
+sed -e "$sed_gpgconf_path" systemd-units/gpg-agent-launch.service > "${dir_tmp}/gpg-agent-launch.service"
+sed -e "$sed_npr_path" -e 's%\%gpg_path_win_socket\%%'"${gpg_path_win_socket}"'%' systemd-units/gpg-agent@.service > "${dir_tmp}/gpg-agent@.service"
+sed -e "$sed_npr_path" -e 's%\%gpg_path_win_socket_extra\%%'"${gpg_path_win_socket_extra}"'%' systemd-units/gpg-agent-extra@.service > "${dir_tmp}/gpg-agent-extra@.service"
+sed -e "$sed_npr_path" systemd-units/gpg-agent-ssh@.service > "${dir_tmp}/gpg-agent-ssh@.service"
+
+###########
+# Install #
+###########
 printf 'Installing...\n'
-sed 's%^ExecStart=\%h/.local/bin/npiperelay.exe%ExecStart='"${nprlocalpath}"'%' systemd-units/gpg-agent-ssh@.service > "${workdir}/gpg-agent-ssh@.service"
-sed 's%^ExecStart=.*%ExecStart='"${nprlocalpath} -ep -ei -s -a '${gpgwinpath}'%" systemd-units/gpg-agent@.service > "${workdir}/gpg-agent@.service"
-cp systemd-units/gpg-agent-ssh.socket systemd-units/gpg-agent.socket "${workdir}/"
-install $verbose -D "${nprfile_w}" "${nprwinpath_u}" && rm "${nprfile_w}"
-install $verbose -Dm 644 -t "${unitdir}" $workdir/*
-install $verbose -Dm 644 systemd-units/gpg-agent-launch.service "${unitdir}/gpg-agent-launch.service"
-install $verbose -d "${localbin}"
-ln $verbose -nfs "${nprwinpath_u}" "${localbin}"
-ln $verbose -nfs "${gpgconfwinpath_u}" "${localbin}/gpgconf-windows.exe"
+
+# Install npiperelay binary from the temporary working directory to the Windows filesystem
+install $verbose -D "${npr_path_tmp}" "${npr_path}"
+rm "${npr_path_tmp}"
+
+# Install the systemd units from the temporary working directory
+install $verbose -Dm 644 -t "${dir_unit}" $dir_tmp/*
+
+# Ensure the local bin directory does exist
+install $verbose -d "${dir_bin}"
+
+# Link npiperelay & gpgconf from the Windows filesystem to the local bin directory
+ln $verbose -nfs "${npr_path}" "${dir_bin}"
+ln $verbose -nfs "${gpgconf_path}" "${dir_bin}/gpgconf-windows.exe"
+
+# Enable the service intended to launch the gpg-agent on windows
 systemctl --user enable gpg-agent-launch.service > /dev/null
 systemctl --user restart gpg-agent-launch.service > /dev/null
 
-rm -r "${workdir}"
+###########
+# Cleanup #
+###########
+# Remove the temporary working directory
+rm -r "${dir_tmp}"
 
 printf 'Installation complete!\n'
