@@ -1,0 +1,12 @@
+[Unit]
+Description=gpg4win to WSL connector for GPG (S.gpg-agent.extra)
+Requires=gpg-agent-extra.socket gpg-agent-launch.service
+After=gpg-agent-launch.service
+
+[Service]
+Type=simple
+ExecStart=%npr_path% -ep -ei -s -a '%gpg_path_win_socket_extra%'
+StandardInput=socket
+
+[Install]
+WantedBy=default.target
